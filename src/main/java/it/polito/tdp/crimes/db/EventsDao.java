@@ -5,12 +5,56 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
+
+import org.jgrapht.Graph;
+import org.jgrapht.graph.DefaultWeightedEdge;
+
+import it.polito.tdp.crimes.model.Arco;
 import it.polito.tdp.crimes.model.Event;
 
 
 public class EventsDao {
-	
+
+	public List<Integer> getMesi(){
+		String sql = "SELECT DISTINCT Month(reported_date) as mese FROM events";
+		List<Integer> mesi = new LinkedList<>();
+		try {
+			Connection conn = DBConnect.getConnection() ;
+			PreparedStatement st = conn.prepareStatement(sql) ;
+			ResultSet res = st.executeQuery() ;
+			while (res.next()) {
+				mesi.add(res.getInt("mese"));
+			}
+			conn.close();
+			Collections.sort(mesi);
+			return mesi;
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return null ;
+		}
+	}
+	public List<String> getCategorie(){
+		String sql = "SELECT DISTINCT offense_category_id as categoria FROM events";
+		List<String> categorie = new LinkedList<>();
+		try {
+			Connection conn = DBConnect.getConnection() ;
+			PreparedStatement st = conn.prepareStatement(sql) ;
+			ResultSet res = st.executeQuery() ;
+			while (res.next()) {
+				categorie.add(res.getString("categoria"));
+			}
+			conn.close();
+			return categorie;
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return null ;
+		}
+	}
 	public List<Event> listAllEvents(){
 		String sql = "SELECT * FROM events" ;
 		try {
@@ -53,5 +97,67 @@ public class EventsDao {
 			return null ;
 		}
 	}
-
+	
+	public List<String> getVertici(String categoria, int mese){
+		String sql = "SELECT DISTINCT offense_type_id " 
+				+ "FROM events "
+				+"WHERE offense_category_id = ? AND Month(reported_date)=? ";
+		List<String> result = new LinkedList<String>();
+		try {
+			Connection conn = DBConnect.getConnection() ;
+			PreparedStatement st = conn.prepareStatement(sql) ;
+			st.setString(1, categoria);
+			st.setInt(2, mese);
+			
+			ResultSet res = st.executeQuery() ;
+			while(res.next()) {
+				result.add(res.getString("offense_type_id"));
+			}
+			st.close();
+			res.close();
+			conn.close();
+			return result;
+			
+	} catch (SQLException e) {
+		// TODO Auto-generated catch block
+		e.printStackTrace();
+		return null ;
+		}
+	}
+	
+	public List<Arco> getArchi(String categoria,int mese){
+		String sql = "SELECT e1.offense_type_id as v1, e2.offense_type_id as v2 , COUNT(DISTINCT(e1.neighborhood_id)) as peso " 
+				+ "FROM events e1, events e2 "
+				+"WHERE e1.offense_category_id = ? AND e1.offense_category_id =e2.offense_category_id "
+				+ "AND Month(e1.reported_date)=? AND Month(e1.reported_date)=Month(e2.reported_date) "
+				+ "AND e1.offense_type_id > e2.offense_type_id "
+				+ "AND e1.neighborhood_id = e2.neighborhood_id "
+				+ "GROUP BY e1.offense_type_id , e2.offense_type_id ";
+		
+		List<Arco> result = new LinkedList<Arco>();
+		
+		try {
+			Connection conn = DBConnect.getConnection() ;
+			PreparedStatement st = conn.prepareStatement(sql) ;
+			st.setString(1, categoria);
+			st.setInt(2, mese);
+			
+			ResultSet res = st.executeQuery() ;
+			
+			while(res.next()) {
+				result.add(new Arco(res.getString("v1"),res.getString("v2"),res.getInt("peso")));
+			}
+			st.close();
+			res.close();
+			conn.close();
+			return result;
+			
+	} catch (SQLException e) {
+		// TODO Auto-generated catch block
+		e.printStackTrace();
+		return null ;
+		}
+	}
 }
+
+
